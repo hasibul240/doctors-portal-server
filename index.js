@@ -22,9 +22,67 @@ async function run() {
         const booking_collection = client.db("Doctors_portal").collection("booking");
 
         app.get('/appointmentOptions', async (req, res) => {
-            const option = await appointments_options_collection.find({}).toArray();
-            res.send(option);
+            const date = req.query.date;
+            const options = await appointments_options_collection.find({}).toArray();
+
+            const booking_query = { appointmentDate: date };
+            const already_booked = await booking_collection.find(booking_query).toArray();
+
+            options.forEach(option => {
+                const option_booker = already_booked.filter(booked => booked.treatment === option.name);
+                const booked_slots = option_booker.map(booked => booked.slot);
+
+                remaning_slots = option.slots.filter(slot => !booked_slots.includes(slot));
+                option.slots = remaning_slots;
+            })
+
+            res.send(options);
         });
+
+        app.get('/v2/appointmentOptions', async (req, res) => {
+            const date = req.query.date;
+            const options = await appointments_options_collection.aggregate([
+                {
+                    $lookup: {
+                        from: 'booking',
+                        localField: 'name',
+                        foreignField: 'treatment',
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ['$appointmentDate', date]
+                                    }
+                                }
+                            }
+                        ],
+                        as: 'booked'
+                    }
+                },
+                {
+                    $project: {
+                        name: 1,
+                        slots: 1,
+                        booked: {
+                            $map: {
+                                input: '$booked',
+                                as: 'book',
+                                in: '$$book.slot'
+                            }
+                        }
+                    }
+                },
+                {
+                    $project: {
+                        name: 1,
+                        slots: {
+                            $setDifference: ['$slots', '$booked']
+                        }
+                    }
+                }
+            ]).toArray();
+            res.send(options);
+        })
 
         app.post('/bookings', async (req, res) => {
             const booking = req.body;
