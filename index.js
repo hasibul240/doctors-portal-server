@@ -87,6 +87,13 @@ async function run() {
             const users = await users_collection.find(query).toArray();
             res.send(users);
 
+        });
+
+        app.get('/users/admin/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email }
+            const user = await users_collection.findOne(query)
+            res.send({ isAdmin: user?.role === 'admin' })
         })
 
         app.post('/bookings', async (req, res) => {
