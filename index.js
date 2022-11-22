@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 require('dotenv').config()
 
@@ -82,6 +82,13 @@ async function run() {
             }
         });
 
+        app.get('/users', async (req, res) => {
+            const query = {};
+            const users = await users_collection.find(query).toArray();
+            res.send(users);
+
+        })
+
         app.post('/bookings', async (req, res) => {
             const booking = req.body;
             const result = await booking_collection.insertOne(booking);
@@ -92,7 +99,22 @@ async function run() {
             const user = req.body;
             const result = await users_collection.insertOne(user);
             res.send(result);
-        })
+        });
+
+        app.put('/users/admin/:id', varifyJWT, async (req, res) => {
+            const decodedEmail = req.decoded.email;
+            const query = { email: decodedEmail };
+            const user = await users_collection.findOne(query);
+            if (user?.role !== 'admin') {
+                return res.status(403).send({ message: "Forbiden Access" });
+            }
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const options = { upsert: true };
+            const updatedDoc = { $set: { role: 'admin' } };
+            const result = await users_collection.updateOne(filter, updatedDoc, options);
+            res.send(result);
+        });
 
     }
     finally {
