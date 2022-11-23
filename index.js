@@ -23,6 +23,7 @@ function varifyJWT(req, res, next) {
         const token = authHeader.split(' ')[1];
         jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
             if (err) {
+                console.log('jwt error');
                 return res.status(403).send({ message: "Forbiden Access" });
             } else {
                 req.decoded = decoded;
@@ -38,7 +39,26 @@ async function run() {
         const appointments_options_collection = client.db("Doctors_portal").collection("appointmentOptions");
         const booking_collection = client.db("Doctors_portal").collection("booking");
         const users_collection = client.db("Doctors_portal").collection("users");
-        const doctors_collection= client.db("Doctors_portal").collection("doctors");
+        const doctors_collection = client.db("Doctors_portal").collection("doctors");
+
+        const verifyAdmin = async (req, res, next) => {
+            const decodedEmail = req.decoded.email;
+            console.log(decodedEmail);
+
+            const query = { email: decodedEmail };
+            console.log(query);
+
+            const user = await users_collection.findOne(query);
+            console.log(user.role);
+
+            if (user.role !== 'admin') {
+                console.log('admin varifiy');
+                return res.status(403).send({ message: 'you are not admin' })
+            } else {
+                console.log('naxt admin')
+                next();
+            }
+        }
 
         app.get('/appointmentOptions', async (req, res) => {
             const date = req.query.date;
@@ -73,7 +93,7 @@ async function run() {
 
         app.get('/appointmentSpecialty', async (req, res) => {
             const query = {};
-            const result = await appointments_options_collection.find(query).project({name:1}).toArray();
+            const result = await appointments_options_collection.find(query).project({ name: 1 }).toArray();
             res.send(result);
         })
 
@@ -115,13 +135,8 @@ async function run() {
             res.send(result);
         });
 
-        app.put('/users/admin/:id', varifyJWT, async (req, res) => {
-            const decodedEmail = req.decoded.email;
-            const query = { email: decodedEmail };
-            const user = await users_collection.findOne(query);
-            if (user?.role !== 'admin') {
-                return res.status(403).send({ message: "Forbiden Access" });
-            }
+        app.put('/users/admin/:id', varifyJWT, verifyAdmin, async (req, res) => {
+
             const id = req.params.id;
             const filter = { _id: ObjectId(id) };
             const options = { upsert: true };
@@ -130,9 +145,23 @@ async function run() {
             res.send(result);
         });
 
-        app.post('/doctors', async (req, res) => {
+        app.get('/doctors', varifyJWT, verifyAdmin, async (req, res) => {
+            const query = {};
+            const doctors = await doctors_collection.find(query).toArray();
+            res.send(doctors);
+        });
+
+        app.post('/doctors', varifyJWT, verifyAdmin, async (req, res) => {
             const doctor = req.body;
-            const result = await doctors_collection.insertOne(doctor);
+            console.log(doctor)
+            const result = await doctors_collection.insertOne(doctor)
+            res.send(result);
+        });
+
+        app.delete('/doctors/:id', varifyJWT, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const result = await doctors_collection.deleteOne(filter);
             res.send(result);
         });
 
