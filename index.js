@@ -3,6 +3,7 @@ const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 require('dotenv').config()
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const port = process.env.PORT || 5000;
 
@@ -60,6 +61,23 @@ async function run() {
             }
         }
 
+        app.post("/create-payment-intent", async (req, res) => {
+            const booking = req.body;
+            const price = booking.price;
+            const amount = price * 100;
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: "usd",
+                amount: amount,
+                "payment_method_types": [
+                    "card"
+                ],
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+              });
+        });
+
         app.get('/appointmentOptions', async (req, res) => {
             const date = req.query.date;
             const options = await appointments_options_collection.find({}).toArray();
@@ -109,6 +127,13 @@ async function run() {
             }
         });
 
+        app.get('/bookings/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const booking = await booking_collection.findOne(query);
+            res.send(booking);
+        });
+
         app.get('/users', async (req, res) => {
             const query = {};
             const users = await users_collection.find(query).toArray();
@@ -131,7 +156,7 @@ async function run() {
                 treatment: booking.treatment
             }
             const alreadyBooked = await booking_collection.find(query).toArray();
-            
+
             if (alreadyBooked.length) {
                 const message = `You already have a booking on ${booking.appointmentDate}`
                 return res.send({ acknowledged: false, message })
