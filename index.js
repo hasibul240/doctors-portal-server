@@ -125,6 +125,17 @@ async function run() {
 
         app.post('/bookings', async (req, res) => {
             const booking = req.body;
+            const query = {
+                appointmentDate: booking.appointmentDate,
+                email: booking.email,
+                treatment: booking.treatment
+            }
+            const alreadyBooked = await booking_collection.find(query).toArray();
+            
+            if (alreadyBooked.length) {
+                const message = `You already have a booking on ${booking.appointmentDate}`
+                return res.send({ acknowledged: false, message })
+            }
             const result = await booking_collection.insertOne(booking);
             res.json(result);
         });
@@ -144,6 +155,16 @@ async function run() {
             const result = await users_collection.updateOne(filter, updatedDoc, options);
             res.send(result);
         });
+
+        //temporary update for price
+        // app.get('/addprice', async (req, res) => {
+        //     console.log('found')
+        //     const filter = {};
+        //     const options = { upsert: true };
+        //     const updatedDoc = { $set: { price: 99 } };
+        //     const result = await appointments_options_collection.updateMany(filter, updatedDoc, options);
+        //     res.send(result);
+        // });
 
         app.get('/doctors', varifyJWT, verifyAdmin, async (req, res) => {
             const query = {};
@@ -178,5 +199,5 @@ app.get('/', (req, res) => {
 })
 
 app.listen(port, () => {
-    console.log('Server started on port 5000');
+    console.log(`Server started on port ${port}`);
 });
