@@ -38,6 +38,7 @@ async function run() {
         const appointments_options_collection = client.db("Doctors_portal").collection("appointmentOptions");
         const booking_collection = client.db("Doctors_portal").collection("booking");
         const users_collection = client.db("Doctors_portal").collection("users");
+        const doctors_collection= client.db("Doctors_portal").collection("doctors");
 
         app.get('/appointmentOptions', async (req, res) => {
             const date = req.query.date;
@@ -68,6 +69,12 @@ async function run() {
             } else {
                 res.status(401).send({ message: "unauthorized Access" });
             }
+        });
+
+        app.get('/appointmentSpecialty', async (req, res) => {
+            const query = {};
+            const result = await appointments_options_collection.find(query).project({name:1}).toArray();
+            res.send(result);
         })
 
         app.get('/bookings', varifyJWT, async (req, res) => {
@@ -120,6 +127,12 @@ async function run() {
             const options = { upsert: true };
             const updatedDoc = { $set: { role: 'admin' } };
             const result = await users_collection.updateOne(filter, updatedDoc, options);
+            res.send(result);
+        });
+
+        app.post('/doctors', async (req, res) => {
+            const doctor = req.body;
+            const result = await doctors_collection.insertOne(doctor);
             res.send(result);
         });
 
