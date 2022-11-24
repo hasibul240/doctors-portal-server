@@ -41,6 +41,7 @@ async function run() {
         const booking_collection = client.db("Doctors_portal").collection("booking");
         const users_collection = client.db("Doctors_portal").collection("users");
         const doctors_collection = client.db("Doctors_portal").collection("doctors");
+        const payment_collection = client.db("Doctors_portal").collection("payment");
 
         const verifyAdmin = async (req, res, next) => {
             const decodedEmail = req.decoded.email;
@@ -73,10 +74,23 @@ async function run() {
                     "card"
                 ],
             });
-            res.send({
-                clientSecret: paymentIntent.client_secret,
-              });
+            res.send({ clientSecret: paymentIntent.client_secret });
         });
+
+        app.post('/payments', async (req, res) => {
+            const payment = req.body;
+            const result = await payment_collection.insertOne(payment);
+            const id = payment.bookingId;
+            const filter = { _id: ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    paid: true,
+                    transectionId: payment.transectionId
+                }
+            };
+            const updateResult = await booking_collection.updateOne(filter, updatedDoc);
+            res.send(result);
+        })
 
         app.get('/appointmentOptions', async (req, res) => {
             const date = req.query.date;
